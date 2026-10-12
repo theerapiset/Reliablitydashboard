@@ -42,13 +42,13 @@ export default function PresentTitle() {
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', gap: 'clamp(24px,4vw,46px)', flexWrap: 'wrap' }}>
           {[
-            ['Presented', year.meta.presented],
-            ['Prepared by', year.meta.preparedBy],
-            ['Target', year.meta.target],
-          ].map(([label, val]) => (
-            <div key={label}>
+            ['Presented', 's1.presented', year.meta.presented],
+            ['Prepared by', 's1.prepared', year.meta.preparedBy],
+            ['Target', 's1.target', year.meta.target],
+          ].map(([label, ovKey, val]) => (
+            <div key={ovKey}>
               <div style={{ fontFamily: ptMono, fontSize: 11, letterSpacing: 1.5, color: pt.textFaint, textTransform: 'uppercase', marginBottom: 5 }}>{label}</div>
-              <div style={{ color: pt.textMuted, fontSize: 'clamp(13px,1.1vw,16px)' }}>{val || '—'}</div>
+              <EffectiveHtml ovKey={ovKey} html={esc(val) || '—'} style={{ color: pt.textMuted, fontSize: 'clamp(13px,1.1vw,16px)' }} />
             </div>
           ))}
         </div>
