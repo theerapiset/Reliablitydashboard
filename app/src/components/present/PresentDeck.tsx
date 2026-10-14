@@ -22,6 +22,7 @@ export default function PresentDeck({
   const containerRef = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(initialIndex);
   const [showControls, setShowControls] = useState(true);
+  const [laserPos, setLaserPos] = useState<{ x: number; y: number } | null>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -79,9 +80,14 @@ export default function PresentDeck({
   return (
     <div
       ref={containerRef}
-      onMouseMove={wake}
+      className="pt-present-root"
+      onMouseMove={(e) => {
+        wake();
+        setLaserPos({ x: e.clientX, y: e.clientY });
+      }}
+      onMouseLeave={() => setLaserPos(null)}
       style={{
-        position: 'fixed', inset: 0, zIndex: 2147483647,
+        position: 'fixed', inset: 0, zIndex: 2147483647, cursor: 'none',
         background: `radial-gradient(120% 100% at 15% 0%, ${pt.bg2} 0%, ${pt.bg1} 45%, ${pt.bg0} 100%)`,
         overflow: 'hidden',
       }}
@@ -121,7 +127,24 @@ export default function PresentDeck({
         <div style={{ height: '100%', width: `${progress * 100}%`, background: pt.blue, transition: 'width .3s ease' }} />
       </div>
 
+      {laserPos && (
+        <div
+          style={{
+            position: 'fixed', left: laserPos.x, top: laserPos.y, transform: 'translate(-50%,-50%)',
+            zIndex: 2147483647, pointerEvents: 'none',
+          }}
+        >
+          <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 26, height: 26, borderRadius: '50%', background: 'rgba(224,30,30,.35)', filter: 'blur(3px)' }} />
+          <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 10, height: 10, borderRadius: '50%', background: '#e01e1e', boxShadow: '0 0 6px 1px rgba(224,30,30,.8)' }} />
+        </div>
+      )}
+
       <style>{`
+        /* Keep the laser-dot illusion everywhere in Present mode — without
+           this, elements with their own cursor:pointer (hover-tooltip KPI
+           tiles, the floating controls, …) would reveal the native arrow. */
+        .pt-present-root, .pt-present-root * { cursor: none !important; }
+
         @keyframes ptFadeIn { from { opacity: 0; transform: translateY(16px) scale(.985); } to { opacity: 1; transform: none; } }
         .pt-slide-in { animation: ptFadeIn .38s cubic-bezier(.2,.8,.2,1); }
 
