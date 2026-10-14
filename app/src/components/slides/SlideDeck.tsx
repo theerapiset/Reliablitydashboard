@@ -29,6 +29,7 @@ export default function SlideDeck({
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   const [presenting, setPresenting] = useState(false);
+  const [printing, setPrinting] = useState(false);
 
   useLayoutEffect(() => {
     const el = stageWrapRef.current;
@@ -60,9 +61,25 @@ export default function SlideDeck({
     return () => document.removeEventListener('fullscreenchange', onFsChange);
   }, []);
 
+  // recharts' <ResponsiveContainer> sizes itself via ResizeObserver, which
+  // never fires for a slide that's display:none — so the CTA/PTA/shutdown
+  // charts on every slide except the one currently open came out blank in
+  // the PDF, since @media print only reveals them at the moment the browser
+  // captures the page, too late for recharts to measure and re-render.
+  // Rendering every slide at display:block a beat before calling
+  // window.print() gives ResizeObserver + React time to catch up first.
+  useEffect(() => {
+    const onAfterPrint = () => setPrinting(false);
+    window.addEventListener('afterprint', onAfterPrint);
+    return () => window.removeEventListener('afterprint', onAfterPrint);
+  }, []);
+
   if (deckRef) {
     deckRef.current = {
-      print: () => window.print(),
+      print: () => {
+        setPrinting(true);
+        setTimeout(() => window.print(), 250);
+      },
       present: () => containerRef.current?.requestFullscreen?.(),
     };
   }
@@ -106,7 +123,13 @@ export default function SlideDeck({
               position: 'absolute', width: DESIGN_W, height: DESIGN_H,
               transform: `scale(${scale})`,
               boxShadow: '0 20px 60px rgba(0,0,0,.5)',
-              display: i === activeIndex ? 'block' : 'none',
+              display: printing || i === activeIndex ? 'block' : 'none',
+              // During the brief pre-print window, lay out every slide (so
+              // ResizeObserver can measure their charts) without flashing
+              // them all stacked on screen — @media print's !important
+              // override still makes them visible once the browser actually
+              // renders the print output.
+              visibility: printing && i !== activeIndex ? 'hidden' : 'visible',
               overflow: 'hidden',
             }}
           >
