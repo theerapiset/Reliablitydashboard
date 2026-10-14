@@ -23,12 +23,20 @@ export default function PresentDeck({
   const [index, setIndex] = useState(initialIndex);
   const [showControls, setShowControls] = useState(true);
   const [laserPos, setLaserPos] = useState<{ x: number; y: number } | null>(null);
+  const [zoomScale, setZoomScale] = useState(1);
+  const [zoomOrigin, setZoomOrigin] = useState({ x: 50, y: 50 });
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (open) setIndex(Math.min(initialIndex, slides.length - 1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  // A zoomed-in view only makes sense for the slide it was zoomed into.
+  useEffect(() => {
+    setZoomScale(1);
+    setZoomOrigin({ x: 50, y: 50 });
+  }, [index]);
 
   useEffect(() => {
     if (!open) return;
@@ -51,6 +59,10 @@ export default function PresentDeck({
       if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') setIndex((i) => Math.min(slides.length - 1, i + 1));
       else if (e.key === 'ArrowLeft' || e.key === 'PageUp') setIndex((i) => Math.max(0, i - 1));
       else if (e.key === 'Escape') onClose();
+      else if (e.key === '0') {
+        setZoomScale(1);
+        setZoomOrigin({ x: 50, y: 50 });
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -61,6 +73,27 @@ export default function PresentDeck({
     setShowControls(true);
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     hideTimerRef.current = setTimeout(() => setShowControls(false), AUTOHIDE_MS);
+  };
+
+  // Ctrl/⌘+scroll zooms into whatever point the cursor is over — hold
+  // ctrl and scroll up to zoom in, scroll down (or press 0) to zoom back
+  // out. The origin is only re-anchored when starting a new zoom-in from
+  // 1x, so continuing to scroll zooms further into the same spot instead
+  // of jumping around as the on-screen content shifts under the cursor.
+  const onWheel = (e: React.WheelEvent) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    const rect = containerRef.current?.getBoundingClientRect();
+    setZoomScale((prev) => {
+      const next = Math.min(4, Math.max(1, prev * Math.exp(-e.deltaY * 0.0015)));
+      if (prev <= 1.001 && next > 1 && rect) {
+        setZoomOrigin({
+          x: ((e.clientX - rect.left) / rect.width) * 100,
+          y: ((e.clientY - rect.top) / rect.height) * 100,
+        });
+      }
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -86,6 +119,7 @@ export default function PresentDeck({
         setLaserPos({ x: e.clientX, y: e.clientY });
       }}
       onMouseLeave={() => setLaserPos(null)}
+      onWheel={onWheel}
       style={{
         position: 'fixed', inset: 0, zIndex: 2147483647, cursor: 'none',
         background: `radial-gradient(120% 100% at 15% 0%, ${pt.bg2} 0%, ${pt.bg1} 45%, ${pt.bg0} 100%)`,
@@ -93,7 +127,15 @@ export default function PresentDeck({
       }}
     >
       {s && (
-        <div key={s.key} className="pt-slide-in" style={{ position: 'absolute', inset: 0 }}>
+        <div
+          key={s.key}
+          className="pt-slide-in"
+          style={{
+            position: 'absolute', inset: 0,
+            transform: `scale(${zoomScale})`, transformOrigin: `${zoomOrigin.x}% ${zoomOrigin.y}%`,
+            transition: 'transform .12s ease-out',
+          }}
+        >
           {s.content}
         </div>
       )}
@@ -101,7 +143,7 @@ export default function PresentDeck({
       <div
         className="pt-controls"
         style={{
-          position: 'absolute', left: '50%', bottom: 24, transform: 'translateX(-50%)',
+          position: 'absolute', left: '50%', bottom: 24, transform: 'translateX(-50%)', zIndex: 2,
           display: 'flex', alignItems: 'center', gap: 12,
           background: '#ffffff', border: `1.5px solid ${pt.glassBorder}`, borderRadius: 999,
           padding: '10px 12px', boxShadow: '0 6px 22px rgba(20,40,70,.14)',
@@ -117,6 +159,21 @@ export default function PresentDeck({
         <button onClick={() => setIndex((i) => Math.min(slides.length - 1, i + 1))} disabled={index === slides.length - 1} style={{ ...ctrlBtn, opacity: index === slides.length - 1 ? 0.35 : 1 }}>
           ›
         </button>
+        {zoomScale > 1.02 && (
+          <>
+            <div style={{ width: 1.5, height: 22, background: pt.glassBorderStrong, margin: '0 2px' }} />
+            <button
+              onClick={() => {
+                setZoomScale(1);
+                setZoomOrigin({ x: 50, y: 50 });
+              }}
+              title="Reset zoom (0)"
+              style={{ ...ctrlBtn, width: 'auto', padding: '0 12px', fontSize: 13, fontWeight: 700, color: pt.blue }}
+            >
+              🔍 {Math.round(zoomScale * 100)}%
+            </button>
+          </>
+        )}
         <div style={{ width: 1.5, height: 22, background: pt.glassBorderStrong, margin: '0 2px' }} />
         <button onClick={onClose} title="Exit (Esc)" style={{ ...ctrlBtn, width: 'auto', padding: '0 16px', fontSize: 15, fontWeight: 700, color: pt.textMuted }}>
           ✕ Exit
