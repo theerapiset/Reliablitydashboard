@@ -1,5 +1,7 @@
 import PptxGenJS from 'pptxgenjs';
 import {
+  concernPageContent,
+  concernPageCount,
   costTotals,
   ctaEsdHoursAccum,
   esc,
@@ -12,7 +14,7 @@ import {
   safetyRecordable,
   unplannedPct,
 } from './calc';
-import { MONTHS, type ConcernBlock, type ShutdownPerfItem, type Store, type Year } from '../types/models';
+import { MONTHS, type ConcernBlock, type ConcernItem, type ShutdownPerfItem, type Store, type Year } from '../types/models';
 
 const NAVY = '14365C';
 const GREEN = '15662F';
@@ -388,29 +390,40 @@ export async function exportYearToPptx(year: Year, store: Store) {
     }
   }
 
-  // ---------- Slide 5+ · Concerning Equipment (one per slide) ----------
+  // ---------- Slide 5+ · Concerning Equipment (one slide per page; a case with extraPages gets several in a row) ----------
   const concernItems = year.concern.map((c, i) => ({ ...c, globalIdx: i })).filter((c) => c.month === mo);
-  for (const [ci, c] of concernItems.entries()) {
+  const concernPageRefs: { item: ConcernItem & { globalIdx: number }; pageIndex: number; pageCount: number }[] = [];
+  concernItems.forEach((item) => {
+    const pageCount = concernPageCount(item);
+    for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) concernPageRefs.push({ item, pageIndex, pageCount });
+  });
+  for (const [si, ref] of concernPageRefs.entries()) {
+    const { item: c, pageIndex, pageCount } = ref;
+    const page = concernPageContent(c, pageIndex);
     const s = pptx.addSlide();
     s.background = { color: 'FFFFFF' };
     s.addShape('rect', { x: 0, y: 0, w: W, h: 0.65, fill: { color: '16202B' } });
-    const headFallback = concernItems.length > 1 ? `Concerning Equipment (${ci + 1}/${concernItems.length})` : 'Concerning Equipment';
-    const headTxt = htmlToLines(ovr(year, `s5.head.${ci}`, headFallback)).join(' ') || headFallback;
+    const headFallback = concernPageRefs.length > 1 ? `Concerning Equipment (${si + 1}/${concernPageRefs.length})` : 'Concerning Equipment';
+    const headTxt = htmlToLines(ovr(year, `s5.head.${si}`, headFallback)).join(' ') || headFallback;
     s.addText(headTxt, { x: 0.5, y: 0.08, w: 10, h: 0.5, fontFace: 'Arial', fontSize: 20, bold: true, color: 'FFFFFF' });
 
     s.addShape('rect', { x: 0.5, y: 0.85, w: 12.333, h: 6.15, fill: { color: 'EEF3F8' } });
     s.addText(c.equipment, { x: 0.75, y: 1.0, w: 10, h: 0.35, fontFace: 'Arial', fontSize: 14, bold: true, color: BLUE });
     s.addText(c.title, { x: 0.75, y: 1.35, w: 9, h: 0.4, fontFace: 'Arial', fontSize: 17, bold: true, color: '16202B' });
+    if (pageCount > 1) {
+      s.addShape('roundRect', { x: 9.75, y: 1.0, w: 1.05, h: 0.3, fill: { color: 'E2E7EE' }, rectRadius: 0.04 });
+      s.addText(`Page ${pageIndex + 1}/${pageCount}`, { x: 9.75, y: 1.0, w: 1.05, h: 0.3, fontFace: 'Arial', fontSize: 8.5, bold: true, color: '5A6878', align: 'center', valign: 'middle' });
+    }
     s.addShape('roundRect', { x: 10.9, y: 1.0, w: 0.95, h: 0.3, fill: { color: 'DCE8F6' }, rectRadius: 0.04 });
     s.addText(c.plant, { x: 10.9, y: 1.0, w: 0.95, h: 0.3, fontFace: 'Arial', fontSize: 9, bold: true, color: BLUE, align: 'center', valign: 'middle' });
     s.addShape('roundRect', { x: 11.95, y: 1.0, w: 0.9, h: 0.3, fill: { color: c.status === 'Resolved' ? 'DCF3E3' : 'F7E6CC' }, rectRadius: 0.04 });
     s.addText(c.status, { x: 11.95, y: 1.0, w: 0.9, h: 0.3, fontFace: 'Arial', fontSize: 9, bold: true, color: c.status === 'Resolved' ? GREEN : 'C47E1A', align: 'center', valign: 'middle' });
 
     const bodyArea: PptxArea = { x: 0.75, y: 1.5, w: 11.83, h: 5.3 };
-    if (c.canvas?.length) {
-      await renderCanvasBlocks(s, c.canvas, bodyArea);
-    } else if (c.fullImage) {
-      const imgs = c.images.slice(0, 1);
+    if (page.canvas?.length) {
+      await renderCanvasBlocks(s, page.canvas, bodyArea);
+    } else if (page.fullImage) {
+      const imgs = page.images.slice(0, 1);
       if (imgs[0]) {
         const imgData = await toEmbeddableDataUrl(imgs[0].src);
         if (imgData) s.addImage({ data: imgData, x: bodyArea.x, y: bodyArea.y, w: bodyArea.w, h: bodyArea.h, sizing: { type: 'contain', w: bodyArea.w, h: bodyArea.h } });
@@ -419,21 +432,22 @@ export async function exportYearToPptx(year: Year, store: Store) {
       }
     } else {
       const bodyFallback =
-        (c.issue ? bullet(`<strong>Issue</strong> ${esc(c.issue)}`) : '') +
-        (c.possibleCause ? bullet(`<strong>Possible cause</strong> ${esc(c.possibleCause)}`) : '') +
-        (c.action ? bullet(`<strong>Action</strong> ${esc(c.action)}`) : '') +
-        (c.preventive ? bullet(`<strong>Preventive</strong> ${esc(c.preventive)}`) : '') +
-        (c.benefit ? bullet(`<strong>Benefit</strong> ${esc(c.benefit)}`) : '') +
-        (c.notes ? bullet(`<strong>Notes</strong> ${esc(c.notes)}`) : '');
-      const override = year.ovr?.[`s5.body.${c.globalIdx}`];
+        (page.issue ? bullet(`<strong>Issue</strong> ${esc(page.issue)}`) : '') +
+        (page.possibleCause ? bullet(`<strong>Possible cause</strong> ${esc(page.possibleCause)}`) : '') +
+        (page.action ? bullet(`<strong>Action</strong> ${esc(page.action)}`) : '') +
+        (page.preventive ? bullet(`<strong>Preventive</strong> ${esc(page.preventive)}`) : '') +
+        (page.benefit ? bullet(`<strong>Benefit</strong> ${esc(page.benefit)}`) : '') +
+        (page.notes ? bullet(`<strong>Notes</strong> ${esc(page.notes)}`) : '');
+      const bodyOvKey = pageIndex === 0 ? `s5.body.${c.globalIdx}` : `s5.body.${c.globalIdx}.extra.${pageIndex - 1}`;
+      const override = year.ovr?.[bodyOvKey];
       const runs = htmlToPptxRuns(override || bodyFallback || '<div>—</div>');
-      const textH = c.images.length ? bodyArea.h * 0.55 : bodyArea.h;
+      const textH = page.images.length ? bodyArea.h * 0.55 : bodyArea.h;
       s.addText(runs, { x: bodyArea.x, y: bodyArea.y, w: bodyArea.w, h: textH, fontFace: 'Arial', fontSize: 12, color: '3A4654', valign: 'top' });
-      if (c.images.length) {
+      if (page.images.length) {
         const imgY = bodyArea.y + textH + 0.15;
         const imgH = bodyArea.h - textH - 0.15;
-        const imgW = Math.min(3.6, bodyArea.w / Math.max(1, c.images.length) - 0.15);
-        for (const [ii, img] of c.images.entries()) {
+        const imgW = Math.min(3.6, bodyArea.w / Math.max(1, page.images.length) - 0.15);
+        for (const [ii, img] of page.images.entries()) {
           const imgData = await toEmbeddableDataUrl(img.src);
           if (imgData) s.addImage({ data: imgData, x: bodyArea.x + ii * (imgW + 0.15), y: imgY, w: imgW, h: imgH, sizing: { type: 'contain', w: imgW, h: imgH } });
         }

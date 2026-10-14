@@ -6,8 +6,8 @@ import EditGate from '../EditGate';
 import { colors, fonts } from '../../theme';
 import ImagePicker from './ImagePicker';
 import ConcernCanvasEditor from './ConcernCanvasEditor';
-import { defaultConcernBlocks, fmt, hoursBetween, monthOf, uid } from '../../utils/calc';
-import { MONTHS, type ConcernBlock, type ImageRef, type ShutdownPerfKpiRow } from '../../types/models';
+import { blankConcernPage, defaultConcernBlocks, fmt, hoursBetween, monthOf, uid } from '../../utils/calc';
+import { MONTHS, type ConcernBlock, type ConcernPage, type ImageRef, type ShutdownPerfKpiRow } from '../../types/models';
 
 const inputStyle: React.CSSProperties = { width: '100%', height: 38, border: '1px solid #cfd7e0', borderRadius: 8, padding: '0 11px', marginTop: 5 };
 const labelStyle: React.CSSProperties = { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1, color: '#7c8a99', textTransform: 'uppercase' };
@@ -21,11 +21,96 @@ function L({ label, children }: { label: string; children: React.ReactNode }) {
   );
 }
 
+// One page's worth of Concerning Equipment content — reused for the case's
+// own (first) page and for each of its extraPages, so every page has the
+// exact same template/full-image/free-layout choice independently.
+function ConcernPageEditor({
+  page,
+  onChange,
+  canvasOpen,
+  onOpenCanvas,
+  onCloseCanvas,
+}: {
+  page: ConcernPage;
+  onChange: (patch: Partial<ConcernPage>) => void;
+  canvasOpen: boolean;
+  onOpenCanvas: () => void;
+  onCloseCanvas: () => void;
+}) {
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={!!page.canvas?.length}
+            onChange={(e) => onChange({ canvas: e.target.checked ? (page.canvas?.length ? page.canvas : defaultConcernBlocks()) : undefined })}
+          />
+          Free layout — arrange text/images freely like PowerPoint
+        </label>
+        {!page.canvas?.length && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            <input type="checkbox" checked={!!page.fullImage} onChange={(e) => onChange({ fullImage: e.target.checked })} />
+            Full-page screenshot (hide text fields, show image large)
+          </label>
+        )}
+      </div>
+
+      {page.canvas?.length ? (
+        <div style={{ marginTop: 14 }}>
+          <button
+            onClick={onOpenCanvas}
+            style={{ height: 40, border: 'none', background: colors.navy, color: '#fff', borderRadius: 8, padding: '0 18px', fontWeight: 700, fontSize: 13 }}
+          >
+            🖊 Edit free layout ({page.canvas.length} block{page.canvas.length === 1 ? '' : 's'})
+          </button>
+          {canvasOpen && <ConcernCanvasEditor blocks={page.canvas} onChange={(blocks) => onChange({ canvas: blocks })} onClose={onCloseCanvas} />}
+        </div>
+      ) : (
+        <>
+          {!page.fullImage && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
+                <L label="Issue">
+                  <textarea value={page.issue} onChange={(e) => onChange({ issue: e.target.value })} rows={3} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5, fontSize: 13, height: 'auto' }} />
+                </L>
+                <L label="Possible cause">
+                  <textarea value={page.possibleCause} onChange={(e) => onChange({ possibleCause: e.target.value })} rows={3} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5, fontSize: 13, height: 'auto' }} />
+                </L>
+                <L label="Action">
+                  <textarea value={page.action} onChange={(e) => onChange({ action: e.target.value })} rows={3} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5, fontSize: 13, height: 'auto' }} />
+                </L>
+                <L label="Preventive action">
+                  <textarea value={page.preventive} onChange={(e) => onChange({ preventive: e.target.value })} rows={3} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5, fontSize: 13, height: 'auto' }} />
+                </L>
+              </div>
+              <div style={{ marginTop: 14 }}>
+                <L label="Benefit (optional)">
+                  <input value={page.benefit} onChange={(e) => onChange({ benefit: e.target.value })} style={inputStyle} />
+                </L>
+              </div>
+            </>
+          )}
+          <div style={{ marginTop: 14 }}>
+            <L label="Notes / free text (optional)">
+              <textarea value={page.notes || ''} onChange={(e) => onChange({ notes: e.target.value })} rows={3} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5, fontSize: 13, height: 'auto' }} />
+            </L>
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <ImagePicker images={page.images || []} onChange={(imgs) => onChange({ images: imgs })} pathPrefix="concern" />
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 export default function EditorModal() {
   const { editor, closeEditor, setEditorData } = useUI();
   const { setStore } = useStore();
   const { isAdmin } = useAuth();
   const [canvasOpen, setCanvasOpen] = useState(false);
+  const [concernCanvasOpenPage, setConcernCanvasOpenPage] = useState<number | null>(null);
 
   if (!editor) return null;
   const { module, idx, data } = editor;
@@ -319,77 +404,52 @@ export default function EditorModal() {
                   <input value={d.title} onChange={(e) => set('title', e.target.value)} style={inputStyle} />
                 </L>
               </div>
-              <div style={{ marginTop: 14, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={!!d.canvas?.length}
-                    onChange={(e) => {
-                      if (e.target.checked) set('canvas', d.canvas?.length ? d.canvas : defaultConcernBlocks());
-                      else set('canvas', undefined);
-                    }}
-                  />
-                  Free layout — arrange text/images freely like PowerPoint
-                </label>
-                {!d.canvas?.length && (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={!!d.fullImage} onChange={(e) => set('fullImage', e.target.checked)} />
-                    Full-page screenshot (hide text fields, show image large)
-                  </label>
-                )}
+              <div style={{ marginTop: 22, borderTop: '2px solid #eef1f5', paddingTop: 16 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: '#1d2733', marginBottom: 10 }}>Page 1</div>
+                <ConcernPageEditor
+                  page={{
+                    id: d.id || 'page1', issue: d.issue, possibleCause: d.possibleCause, action: d.action,
+                    preventive: d.preventive, benefit: d.benefit, notes: d.notes, images: d.images,
+                    fullImage: d.fullImage, canvas: d.canvas,
+                  }}
+                  onChange={(patch) => setEditorData({ ...d, ...patch })}
+                  canvasOpen={concernCanvasOpenPage === 0}
+                  onOpenCanvas={() => setConcernCanvasOpenPage(0)}
+                  onCloseCanvas={() => setConcernCanvasOpenPage(null)}
+                />
               </div>
 
-              {d.canvas?.length ? (
-                <div style={{ marginTop: 14 }}>
-                  <button
-                    onClick={() => setCanvasOpen(true)}
-                    style={{ height: 40, border: 'none', background: colors.navy, color: '#fff', borderRadius: 8, padding: '0 18px', fontWeight: 700, fontSize: 13 }}
-                  >
-                    🖊 Edit free layout ({d.canvas.length} block{d.canvas.length === 1 ? '' : 's'})
-                  </button>
-                  {canvasOpen && (
-                    <ConcernCanvasEditor
-                      blocks={d.canvas as ConcernBlock[]}
-                      onChange={(blocks) => set('canvas', blocks)}
-                      onClose={() => setCanvasOpen(false)}
-                    />
-                  )}
+              {((d.extraPages || []) as ConcernPage[]).map((p, pi) => (
+                <div key={p.id} style={{ marginTop: 22, borderTop: '2px solid #eef1f5', paddingTop: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: '#1d2733', flex: 1 }}>Page {pi + 2}</div>
+                    <button
+                      onClick={() => set('extraPages', ((d.extraPages || []) as ConcernPage[]).filter((_, i2) => i2 !== pi))}
+                      style={{ border: '1px solid #f0d4d4', background: '#fff', color: '#c0392b', borderRadius: 6, padding: '5px 10px', fontSize: 12 }}
+                    >
+                      ✕ Delete page
+                    </button>
+                  </div>
+                  <ConcernPageEditor
+                    page={p}
+                    onChange={(patch) => {
+                      const pages = [...((d.extraPages || []) as ConcernPage[])];
+                      pages[pi] = { ...pages[pi], ...patch };
+                      set('extraPages', pages);
+                    }}
+                    canvasOpen={concernCanvasOpenPage === pi + 1}
+                    onOpenCanvas={() => setConcernCanvasOpenPage(pi + 1)}
+                    onCloseCanvas={() => setConcernCanvasOpenPage(null)}
+                  />
                 </div>
-              ) : (
-                <>
-                  {!d.fullImage && (
-                    <>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
-                        <L label="Issue">
-                          <textarea value={d.issue} onChange={(e) => set('issue', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5, fontSize: 13, height: 'auto' }} />
-                        </L>
-                        <L label="Possible cause">
-                          <textarea value={d.possibleCause} onChange={(e) => set('possibleCause', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5, fontSize: 13, height: 'auto' }} />
-                        </L>
-                        <L label="Action">
-                          <textarea value={d.action} onChange={(e) => set('action', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5, fontSize: 13, height: 'auto' }} />
-                        </L>
-                        <L label="Preventive action">
-                          <textarea value={d.preventive} onChange={(e) => set('preventive', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5, fontSize: 13, height: 'auto' }} />
-                        </L>
-                      </div>
-                      <div style={{ marginTop: 14 }}>
-                        <L label="Benefit (optional)">
-                          <input value={d.benefit} onChange={(e) => set('benefit', e.target.value)} style={inputStyle} />
-                        </L>
-                      </div>
-                    </>
-                  )}
-                  <div style={{ marginTop: 14 }}>
-                    <L label="Notes / free text (optional)">
-                      <textarea value={d.notes || ''} onChange={(e) => set('notes', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.5, fontSize: 13, height: 'auto' }} />
-                    </L>
-                  </div>
-                  <div style={{ marginTop: 14 }}>
-                    <ImagePicker images={(d.images || []) as ImageRef[]} onChange={(imgs) => set('images', imgs)} pathPrefix="concern" />
-                  </div>
-                </>
-              )}
+              ))}
+
+              <button
+                onClick={() => set('extraPages', [...((d.extraPages || []) as ConcernPage[]), blankConcernPage()])}
+                style={{ marginTop: 18, height: 38, border: '1px dashed #cfd7e0', background: '#fff', borderRadius: 8, padding: '0 16px', fontSize: 13, fontWeight: 600, color: colors.blue }}
+              >
+                + Add page
+              </button>
             </>
           )}
 

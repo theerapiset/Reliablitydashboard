@@ -18,6 +18,7 @@ export function blankRow(module: EditorModule, store: Store): Record<string, unk
     return {
       month: store.activeMonth, equipment: '', plant: 'P#1', status: 'Monitoring', title: '', issue: '',
       possibleCause: '', action: '', preventive: '', benefit: '', images: [], notes: '', fullImage: false,
+      extraPages: [],
     };
   if (module === 'shutdownPerf')
     return { month: store.activeMonth, shutdownCode: '', kpiRows: defaultShutdownKpiRows(), canvas: [] };

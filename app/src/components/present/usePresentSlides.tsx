@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useStore } from '../../store/StoreContext';
-import { applySlideOrder } from '../../utils/calc';
+import { applySlideOrder, concernPageCount } from '../../utils/calc';
 import type { PresentSlideSpec } from './PresentDeck';
+import type { ConcernItem } from '../../types/models';
 import PresentTitle from './slides/PresentTitle';
 import PresentSafetyReliability from './slides/PresentSafetyReliability';
 import PresentCost from './slides/PresentCost';
@@ -15,8 +16,11 @@ export function usePresentSlides(): PresentSlideSpec[] {
 
   return useMemo(() => {
     const concernItems = year.concern.map((c, i) => ({ ...c, globalIdx: i })).filter((c) => c.month === store.activeMonth);
-    const concernPages: (typeof concernItems)[] = [];
-    for (let i = 0; i < concernItems.length; i += 1) concernPages.push(concernItems.slice(i, i + 1));
+    const concernPageRefs: { item: ConcernItem & { globalIdx: number }; pageIndex: number; pageCount: number }[] = [];
+    concernItems.forEach((item) => {
+      const pageCount = concernPageCount(item);
+      for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) concernPageRefs.push({ item, pageIndex, pageCount });
+    });
     const shutdownPerfItems = (year.shutdownPerf || []).filter((p) => p.month === store.activeMonth);
 
     const list: PresentSlideSpec[] = [
@@ -30,8 +34,8 @@ export function usePresentSlides(): PresentSlideSpec[] {
     shutdownPerfItems.forEach((item, pi) => {
       list.push({ key: `sdperf-${pi}`, content: <PresentShutdownPerf item={item} itemIndex={pi} total={shutdownPerfItems.length} /> });
     });
-    concernPages.forEach((items, pi) => {
-      list.push({ key: `concern-${pi}`, content: <PresentConcern items={items} itemIndex={pi} /> });
+    concernPageRefs.forEach((ref, si) => {
+      list.push({ key: `concern-${ref.item.globalIdx}-${ref.pageIndex}`, content: <PresentConcern item={ref.item} pageIndex={ref.pageIndex} pageCount={ref.pageCount} slideIndex={si} /> });
     });
     (year.backups || []).forEach((src, i) => {
       list.push({ key: `backup-${i}`, content: <PresentBackup src={src} /> });

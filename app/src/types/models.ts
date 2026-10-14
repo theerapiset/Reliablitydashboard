@@ -111,6 +111,26 @@ export interface ConcernBlock {
   src?: string; // image blocks: image URL/data URL
 }
 
+/**
+ * The content of one slide/page for a Concerning Equipment case — either
+ * the structured issue/possibleCause/... fields, a full-page screenshot, or
+ * a free-layout canvas. A case's first page is kept flat on ConcernItem
+ * itself (see below) for backward compatibility with existing data/overrides;
+ * `extraPages` holds any additional pages (2nd, 3rd, ...) in this same shape.
+ */
+export interface ConcernPage {
+  id: string;
+  issue: string;
+  possibleCause: string;
+  action: string;
+  preventive: string;
+  benefit: string;
+  images: ImageRef[];
+  notes?: string;
+  fullImage?: boolean;
+  canvas?: ConcernBlock[];
+}
+
 export interface ConcernItem {
   id: string;
   month: MonthName | '';
@@ -129,6 +149,10 @@ export interface ConcernItem {
   // When set (non-empty), this concern item uses the free-layout canvas
   // instead of the structured issue/possibleCause/... fields above.
   canvas?: ConcernBlock[];
+  // Additional pages/slides for this same case (equipment/plant/status/title
+  // stay shared across all of a case's pages) — each one independently
+  // structured, full-image, or free-layout.
+  extraPages?: ConcernPage[];
 }
 
 export interface ShutdownPerfKpiRow {

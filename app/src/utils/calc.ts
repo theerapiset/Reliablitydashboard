@@ -3,6 +3,8 @@ import {
   RECORDABLE_CATEGORIES,
   SAFETY_CATEGORIES,
   type ConcernBlock,
+  type ConcernItem,
+  type ConcernPage,
   type MonthName,
   type ReliabilityEvent,
   type SafetyCategory,
@@ -233,6 +235,32 @@ const SHUTDOWN_KPI_ICONS: Record<string, string> = {
 
 export function shutdownKpiIcon(label: string): string {
   return SHUTDOWN_KPI_ICONS[label] || '📌';
+}
+
+/** Starting point for a new extra page on a Concerning Equipment case — empty structured fields. */
+export function blankConcernPage(): ConcernPage {
+  return { id: uid(), issue: '', possibleCause: '', action: '', preventive: '', benefit: '', notes: '', images: [], fullImage: false, canvas: [] };
+}
+
+/** How many slides/pages a Concerning Equipment case renders as — its own page plus any extraPages. */
+export function concernPageCount(item: ConcernItem): number {
+  return 1 + (item.extraPages?.length || 0);
+}
+
+/**
+ * The content for one page of a Concerning Equipment case. Page 0 is the
+ * item's own flat fields (kept flat for backward compatibility with
+ * existing data/overrides); page 1+ comes from `extraPages`.
+ */
+export function concernPageContent(item: ConcernItem, pageIndex: number): ConcernPage {
+  if (pageIndex === 0) {
+    return {
+      id: item.id, issue: item.issue, possibleCause: item.possibleCause, action: item.action,
+      preventive: item.preventive, benefit: item.benefit, notes: item.notes, images: item.images,
+      fullImage: item.fullImage, canvas: item.canvas,
+    };
+  }
+  return item.extraPages![pageIndex - 1];
 }
 
 export function applySlideOrder<T extends { key: string }>(items: T[], order: string[] | undefined): T[] {

@@ -13,7 +13,7 @@ import ConcernSlide from '../slides/ConcernSlide';
 import BackupSlide from '../slides/BackupSlide';
 import { exportYearToPptx } from '../../utils/exportPptx';
 import { uploadImages } from '../../utils/uploadImage';
-import { applySlideOrder } from '../../utils/calc';
+import { applySlideOrder, concernPageCount } from '../../utils/calc';
 import type { ConcernItem } from '../../types/models';
 
 export default function MonthlySlides() {
@@ -24,8 +24,11 @@ export default function MonthlySlides() {
   const [activeIndex, setActiveIndex] = useState(0);
 
   const concernItems = year.concern.map((c, i) => ({ ...c, globalIdx: i })).filter((c) => c.month === store.activeMonth);
-  const concernPages: (ConcernItem & { globalIdx: number })[][] = [];
-  for (let i = 0; i < concernItems.length; i += 1) concernPages.push(concernItems.slice(i, i + 1));
+  const concernPageRefs: { item: ConcernItem & { globalIdx: number }; pageIndex: number; pageCount: number }[] = [];
+  concernItems.forEach((item) => {
+    const pageCount = concernPageCount(item);
+    for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) concernPageRefs.push({ item, pageIndex, pageCount });
+  });
   const shutdownPerfItems = (year.shutdownPerf || []).filter((p) => p.month === store.activeMonth);
 
   const slides: SlideSpec[] = useMemo(() => {
@@ -40,8 +43,12 @@ export default function MonthlySlides() {
     shutdownPerfItems.forEach((item, pi) => {
       list.push({ key: `sdperf-${pi}`, label: `${item.shutdownCode || 'Shutdown'} Performance`, content: <ShutdownPerformanceSlide item={item} itemIndex={pi} total={shutdownPerfItems.length} /> });
     });
-    concernPages.forEach((items, pi) => {
-      list.push({ key: `concern-${pi}`, label: `Concerning (${pi + 1}/${concernPages.length || 1})`, content: <ConcernSlide items={items} itemIndex={pi} /> });
+    concernPageRefs.forEach((ref, si) => {
+      list.push({
+        key: `concern-${ref.item.globalIdx}-${ref.pageIndex}`,
+        label: `Concerning (${si + 1}/${concernPageRefs.length || 1})`,
+        content: <ConcernSlide item={ref.item} pageIndex={ref.pageIndex} pageCount={ref.pageCount} slideIndex={si} />,
+      });
     });
     (year.backups || []).forEach((src, i) => {
       list.push({ key: `backup-${i}`, label: `Backup ${i + 1}`, content: <BackupSlide src={src} /> });
