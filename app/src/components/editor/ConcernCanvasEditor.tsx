@@ -5,8 +5,37 @@ import { uploadImages } from '../../utils/uploadImage';
 import type { ConcernBlock } from '../../types/models';
 
 const SWATCHES = ['#16202b', '#1668c4', '#15662f', '#cf2e2e', '#c47e1a'];
+const SIZES = [11, 13, 16, 20, 24];
 const MIN_W = 6;
 const MIN_H = 5;
+
+// Pasting from another app (Word, a webpage, …) normally carries over its
+// own font/size as inline styles on the pasted HTML — exactly the "pasted
+// text looks small and in a different font" complaint. Stripping to plain
+// text makes pasted content inherit this block's own font/size instead.
+function pasteAsPlainText(e: React.ClipboardEvent<HTMLDivElement>) {
+  e.preventDefault();
+  const text = e.clipboardData.getData('text/plain');
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  const lines = text.split(/\r\n|\r|\n/);
+  const frag = document.createDocumentFragment();
+  let lastNode: Node = frag;
+  lines.forEach((line, i) => {
+    const node = document.createTextNode(line);
+    frag.appendChild(node);
+    lastNode = node;
+    if (i < lines.length - 1) frag.appendChild(document.createElement('br'));
+  });
+  range.insertNode(frag);
+  const newRange = document.createRange();
+  newRange.setStartAfter(lastNode);
+  newRange.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(newRange);
+}
 
 interface DragState {
   id: string;
@@ -199,6 +228,30 @@ export default function ConcernCanvasEditor({
     document.execCommand(cmd, false, value);
   };
 
+  // execCommand('fontSize') only supports the legacy 1-7 scale and produces
+  // non-exportable <font> tags, so size is applied by hand: wrap the
+  // selection in a span with an inline font-size instead.
+  const applyFontSize = (px: number) => {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || sel.isCollapsed) return;
+    const range = sel.getRangeAt(0);
+    const span = document.createElement('span');
+    span.style.fontSize = `${px}px`;
+    try {
+      range.surroundContents(span);
+    } catch {
+      // Selection crosses more than one element (e.g. spans two lines) —
+      // surroundContents can't wrap that directly, so move the content in.
+      const frag = range.extractContents();
+      span.appendChild(frag);
+      range.insertNode(span);
+    }
+    sel.removeAllRanges();
+    const newRange = document.createRange();
+    newRange.selectNodeContents(span);
+    sel.addRange(newRange);
+  };
+
   const onPasteImage = (e: React.ClipboardEvent) => {
     if (editingId) return; // pasting into a text block should paste text, not intercept as an image
     const items = e.clipboardData?.items;
@@ -252,6 +305,19 @@ export default function ConcernCanvasEditor({
             <>
               <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat('bold')} style={{ ...btnStyle, width: 32, padding: 0, fontWeight: 800 }}>B</button>
               <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat('underline')} style={{ ...btnStyle, width: 32, padding: 0, textDecoration: 'underline' }}>U</button>
+              <div style={{ width: 1, height: 20, background: '#e2e7ee', margin: '0 2px' }} />
+              {SIZES.map((s) => (
+                <button
+                  key={s}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applyFontSize(s)}
+                  title={`${s}px`}
+                  style={{ ...btnStyle, width: 'auto', padding: '0 8px', fontSize: Math.min(16, 10 + s / 4) }}
+                >
+                  {s}
+                </button>
+              ))}
+              <div style={{ width: 1, height: 20, background: '#e2e7ee', margin: '0 2px' }} />
               {SWATCHES.map((c) => (
                 <button
                   key={c}
@@ -261,7 +327,7 @@ export default function ConcernCanvasEditor({
                   style={{ width: 22, height: 22, borderRadius: '50%', border: '1.5px solid #fff', outline: '1px solid #cfd7e0', background: c, padding: 0 }}
                 />
               ))}
-              <span style={{ fontSize: 11, color: colors.muted, marginLeft: 6 }}>(double-click the text box, select text, then pick a style)</span>
+              <span style={{ fontSize: 11, color: colors.muted, marginLeft: 6 }}>(double-click the text box, select text, then pick a style or size)</span>
             </>
           )}
           <div style={{ flex: 1 }} />
@@ -317,6 +383,7 @@ export default function ConcernCanvasEditor({
                       contentEditable={isEditing}
                       suppressContentEditableWarning
                       onMouseDown={(e) => { if (isEditing) e.stopPropagation(); }}
+                      onPaste={isEditing ? pasteAsPlainText : undefined}
                       onBlur={(e) => { commitEditingHtml(b.id, e.currentTarget); setEditingId(null); }}
                       style={{ width: '100%', height: '100%', padding: '6px 8px', fontSize: 13, lineHeight: 1.5, outline: 'none', overflow: 'auto', cursor: isEditing ? 'text' : 'inherit' }}
                       dangerouslySetInnerHTML={{ __html: b.html || '' }}
