@@ -14,6 +14,9 @@ import ShutdownActivities from './components/views/ShutdownActivities';
 import ShutdownPerformance from './components/views/ShutdownPerformance';
 import ConcerningEquipment from './components/views/ConcerningEquipment';
 import MonthlySlides from './components/views/MonthlySlides';
+import WeeklyTop10 from './components/views/WeeklyTop10';
+import PlantTrouble from './components/views/PlantTrouble';
+import CriticalMonitoring from './components/views/CriticalMonitoring';
 import PresentDeck from './components/present/PresentDeck';
 import { usePresentSlides } from './components/present/usePresentSlides';
 
@@ -38,6 +41,12 @@ function ActiveView() {
       return <ConcerningEquipment />;
     case 'slides':
       return <MonthlySlides />;
+    case 'weeklyTop10':
+      return <WeeklyTop10 />;
+    case 'plantTrouble':
+      return <PlantTrouble />;
+    case 'critMonitor':
+      return <CriticalMonitoring />;
     default:
       return null;
   }

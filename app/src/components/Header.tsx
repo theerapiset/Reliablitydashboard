@@ -17,7 +17,12 @@ const TITLES: Record<ViewId, [string, string]> = {
   shutdownPerf: ['Shutdown Performance', 'KPI vs plan & highlight activities'],
   concern: ['Concerning Equipment', 'Equipment under watch'],
   slides: ['Monthly Slides', 'Preview · edit · export presentation'],
+  weeklyTop10: ['Weekly Top 10', 'Reliability & Asset Integrity · plant concerning board'],
+  plantTrouble: ['Plant Trouble Follow-up', 'Corrective / preventive action tracking'],
+  critMonitor: ['Critical Equipment Monitoring', 'Trends, PI links & alert limits'],
 };
+
+const WEEKLY_VIEWS: ViewId[] = ['weeklyTop10', 'plantTrouble', 'critMonitor'];
 
 const selectStyle: React.CSSProperties = {
   height: 36,
@@ -104,6 +109,7 @@ export default function Header() {
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: sync.dot, flex: 'none' }} />
           {sync.label}
         </span>
+        {!WEEKLY_VIEWS.includes(view) && (<>
         <span style={{ fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: 1, color: '#8a97a6', textTransform: 'uppercase' }}>
           Period
         </span>
@@ -121,6 +127,7 @@ export default function Header() {
             </option>
           ))}
         </select>
+        </>)}
         {isAdmin && (
           <button
             onClick={startNewYear}
