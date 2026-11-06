@@ -245,6 +245,119 @@ export interface Store {
   activeYear: number;
   activeMonth: MonthName;
   years: Record<string, Year>;
+  weekly?: WeeklyData; // week-based monitoring (not tied to a reporting year)
+}
+
+// ---------- Weekly reliability monitoring ----------
+
+export type WeeklyPlant = 'Plant 1' | 'Plant 2' | 'Plant 3' | 'UT';
+export type Top10Source = 'PCD' | 'IDB' | 'MANUAL';
+export type Top10Status = 'open' | 'verifying' | 'closed';
+export type StepStatus = 'Open' | 'Watch' | 'Done';
+
+export interface MitigationStep {
+  text: string;
+  result: string;
+  status: StepStatus;
+}
+
+export interface Top10Link {
+  kind: 'pi' | 'link' | 'app';
+  label: string;
+  url: string;
+}
+
+export interface Top10Item {
+  id: string;
+  src: Top10Source;
+  tag: string;
+  plant: WeeklyPlant;
+  detail: string; // topic
+  background: string;
+  l: number; // likelihood 1–5, 0 = not assessed
+  i: number; // impact 1–5, 0 = not assessed
+  owner: string;
+  due: string; // yyyy-mm-dd
+  steps: MitigationStep[];
+  photos: { src: string; label: string }[];
+  links: Top10Link[];
+  status: Top10Status;
+  cls: { eqClass: string; mode: string; mech: string; cause: string };
+  ver: { rl: string; ri: string; method: string; evidence: string; by: string; date: string; recheck: string; accept: boolean };
+}
+
+export interface Top10SnapshotItem {
+  id: string;
+  tag: string;
+  l: number;
+  i: number;
+  status: Top10Status;
+}
+
+export interface WeeklyRecipient {
+  id: string;
+  name: string;
+  role: string;
+  on: boolean;
+  ack: string; // acknowledged-at stamp, '' = pending
+}
+
+export interface TroubleLog {
+  at: string;
+  text: string;
+  sent: boolean;
+}
+
+export interface TroubleItem {
+  id: string;
+  title: string;
+  plant: '1' | '2' | '3' | 'UT';
+  date: string;
+  corrective: string;
+  preventive: string;
+  status: 'In-progress' | 'Completed';
+  due: string;
+  owner: string;
+  log: TroubleLog[];
+  ver: number; // bumped on every edit
+  sentVer: number; // ver at last send
+  lastSent: string;
+}
+
+export type MonitorIcon = 'motor' | 'compressor' | 'agitator' | 'centrifuge' | 'hx';
+
+export interface MonitorGroup {
+  id: string;
+  name: string;
+  icon: MonitorIcon;
+  links: Top10Link[];
+}
+
+export interface MonitorAsset {
+  id: string;
+  group: string;
+  tag: string;
+  plant: string;
+  service: string;
+  param: string;
+  unit: string;
+  alert: number;
+  danger: number;
+  sample: boolean;
+  note: string;
+  readings: { d: string; v: number }[];
+}
+
+export interface WeeklyData {
+  top10: Top10Item[];
+  snapshots: Record<string, Top10SnapshotItem[]>; // ISO week key (e.g. 2026-W42) -> frozen board at send time
+  removed: { id: string; tag: string; reason: string; week: string }[];
+  recips: WeeklyRecipient[];
+  sentAt: string;
+  sentWeek: string;
+  troubles: TroubleItem[];
+  groups: MonitorGroup[];
+  assets: MonitorAsset[];
 }
 
 export type ViewId =
@@ -256,7 +369,10 @@ export type ViewId =
   | 'shutdown'
   | 'shutdownPerf'
   | 'concern'
-  | 'slides';
+  | 'slides'
+  | 'weeklyTop10'
+  | 'plantTrouble'
+  | 'critMonitor';
 
 export type RelModule = 'cta' | 'pta';
 export type EditorModule = 'safety' | RelModule | 'cost' | 'concern' | 'shutdownPerf';
