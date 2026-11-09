@@ -28,57 +28,8 @@ export default function Sidebar() {
     { id: 'slides', label: 'Monthly Slides', dot: '#8fe3a8' },
   ];
 
-  const weekly = store.weekly;
-  const weeklyNav: NavItem[] = [
-    { id: 'weeklyTop10', label: 'Weekly Top 10', dot: '#f59e0b', badge: weekly?.top10.filter((r) => r.status !== 'closed').length },
-    { id: 'plantTrouble', label: 'Plant Trouble Follow-up', dot: '#e07b2e', badge: weekly?.troubles.filter((r) => r.status === 'In-progress').length },
-    { id: 'critMonitor', label: 'Critical Equip. Monitoring', dot: '#2e9e5b', badge: weekly?.assets.length },
-  ];
-
   const recordCount =
     year.safety.log.length + year.cta.length + year.pta.length + year.cost.length + concernCount;
-
-  const renderItem = (item: NavItem) => {
-          const active = view === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => setView(item.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                width: '100%',
-                border: 'none',
-                cursor: 'pointer',
-                textAlign: 'left',
-                padding: '9px 11px',
-                borderRadius: 7,
-                fontSize: 13.5,
-                fontWeight: active ? 700 : 500,
-                background: active ? colors.navActive : 'transparent',
-                color: active ? '#fff' : '#aebfd0',
-              }}
-            >
-              <span style={{ width: 7, height: 7, borderRadius: 2, flex: 'none', background: item.dot }} />
-              <span style={{ flex: 1, textAlign: 'left' }}>{item.label}</span>
-              {!!item.badge && (
-                <span
-                  style={{
-                    fontFamily: fonts.mono,
-                    fontSize: 10,
-                    background: colors.navHairline,
-                    color: '#9fb4c8',
-                    padding: '1px 6px',
-                    borderRadius: 9,
-                  }}
-                >
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          );
-  };
 
   return (
     <aside
@@ -134,11 +85,47 @@ export default function Sidebar() {
         </div>
       </div>
       <nav style={{ padding: 12, flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {nav.map(renderItem)}
-        <div style={{ fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.4, color: '#5f7286', textTransform: 'uppercase', padding: '16px 11px 6px' }}>
-          Weekly monitoring
-        </div>
-        {weeklyNav.map(renderItem)}
+        {nav.map((item) => {
+          const active = view === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setView(item.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                width: '100%',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                padding: '9px 11px',
+                borderRadius: 7,
+                fontSize: 13.5,
+                fontWeight: active ? 700 : 500,
+                background: active ? colors.navActive : 'transparent',
+                color: active ? '#fff' : '#aebfd0',
+              }}
+            >
+              <span style={{ width: 7, height: 7, borderRadius: 2, flex: 'none', background: item.dot }} />
+              <span style={{ flex: 1, textAlign: 'left' }}>{item.label}</span>
+              {!!item.badge && (
+                <span
+                  style={{
+                    fontFamily: fonts.mono,
+                    fontSize: 10,
+                    background: colors.navHairline,
+                    color: '#9fb4c8',
+                    padding: '1px 6px',
+                    borderRadius: 9,
+                  }}
+                >
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </nav>
       <div
         style={{
