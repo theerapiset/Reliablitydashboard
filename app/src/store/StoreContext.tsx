@@ -2,7 +2,6 @@ import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { db, firebaseConfigured } from '../firebase';
 import { blankYear, seedStore } from '../data/seed';
-import { seedWeekly } from '../data/weeklySeed';
 import type { Store, Year } from '../types/models';
 
 // Local cache only — a fast-loading fallback so the UI isn't blank while the
@@ -16,7 +15,6 @@ const STORE_DOC = doc(db, 'stores', 'main');
 export type SyncStatus = 'loading' | 'synced' | 'saving' | 'offline' | 'unconfigured';
 
 function migrate(store: Store) {
-  if (!store.weekly) store.weekly = seedWeekly();
   Object.values(store.years || {}).forEach((yr) => {
     if (!yr.ovr) yr.ovr = {};
     if (!yr.backups) yr.backups = [];
@@ -60,10 +58,7 @@ const StoreContext = createContext<StoreContextValue | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [store, setStoreState] = useState<Store>(() => {
     const cached = readCache();
-    if (cached) {
-      migrate(cached);
-      return cached;
-    }
+    if (cached) return cached;
     const fresh = seedStore();
     migrate(fresh);
     return fresh;
