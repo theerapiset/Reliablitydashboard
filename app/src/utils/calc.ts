@@ -277,3 +277,10 @@ export function applySlideOrder<T extends { key: string }>(items: T[], order: st
   byKey.forEach((it) => ordered.push(it));
   return ordered;
 }
+
+/** Drop any items whose key the user chose to hide from this month's deck/PDF/PPTX/Present. */
+export function filterHiddenSlides<T extends { key: string }>(items: T[], hidden: string[] | undefined): T[] {
+  if (!hidden || !hidden.length) return items;
+  const hiddenSet = new Set(hidden);
+  return items.filter((it) => !hiddenSet.has(it.key));
+}

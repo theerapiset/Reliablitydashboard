@@ -13,7 +13,7 @@ import ConcernSlide from '../slides/ConcernSlide';
 import BackupSlide from '../slides/BackupSlide';
 import { exportYearToPptx } from '../../utils/exportPptx';
 import { uploadImages } from '../../utils/uploadImage';
-import { applySlideOrder, concernPageCount } from '../../utils/calc';
+import { applySlideOrder, concernPageCount, filterHiddenSlides } from '../../utils/calc';
 import type { ConcernItem } from '../../types/models';
 
 export default function MonthlySlides() {
@@ -31,7 +31,7 @@ export default function MonthlySlides() {
   });
   const shutdownPerfItems = (year.shutdownPerf || []).filter((p) => p.month === store.activeMonth);
 
-  const slides: SlideSpec[] = useMemo(() => {
+  const allSlides: SlideSpec[] = useMemo(() => {
     const list: SlideSpec[] = [
       { key: 'title', label: 'Title', content: <TitleSlide /> },
       { key: 'safety-rel', label: 'Safety & Reliability', content: <SafetyReliabilitySlide /> },
@@ -53,11 +53,43 @@ export default function MonthlySlides() {
     (year.backups || []).forEach((src, i) => {
       list.push({ key: `backup-${i}`, label: `Backup ${i + 1}`, content: <BackupSlide src={src} /> });
     });
-    return applySlideOrder(list, year.slideOrder?.[store.activeMonth]);
+    return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, store.activeMonth]);
 
+  const hiddenKeys = year.hiddenSlides?.[store.activeMonth] || [];
+  const hiddenSlides = allSlides.filter((s) => hiddenKeys.includes(s.key));
+  const slides: SlideSpec[] = useMemo(
+    () => applySlideOrder(filterHiddenSlides(allSlides, hiddenKeys), year.slideOrder?.[store.activeMonth]),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allSlides, hiddenKeys.join(','), year.slideOrder, store.activeMonth]
+  );
+
   const clampedIndex = Math.min(activeIndex, slides.length - 1);
+
+  const [hiddenPanelOpen, setHiddenPanelOpen] = useState(false);
+
+  const onReorderSlides = (keys: string[]) =>
+    setStore((s) => {
+      const yr = s.years[String(s.activeYear)];
+      if (!yr.slideOrder) yr.slideOrder = {};
+      yr.slideOrder[store.activeMonth] = keys;
+    });
+
+  const onHideSlide = (key: string) =>
+    setStore((s) => {
+      const yr = s.years[String(s.activeYear)];
+      if (!yr.hiddenSlides) yr.hiddenSlides = {};
+      const cur = yr.hiddenSlides[store.activeMonth] || [];
+      if (!cur.includes(key)) yr.hiddenSlides[store.activeMonth] = [...cur, key];
+    });
+
+  const onShowSlide = (key: string) =>
+    setStore((s) => {
+      const yr = s.years[String(s.activeYear)];
+      if (!yr.hiddenSlides?.[store.activeMonth]) return;
+      yr.hiddenSlides[store.activeMonth] = yr.hiddenSlides[store.activeMonth].filter((k) => k !== key);
+    });
 
   const addBackupFiles = async (files: FileList | File[]) => {
     const urls = await uploadImages(files, 'backup');
@@ -134,6 +166,38 @@ export default function MonthlySlides() {
           <button onClick={() => exportYearToPptx(year, store)} title="Export editable PowerPoint" style={{ height: 28, border: 'none', background: '#c2571f', color: '#fff', borderRadius: 6, padding: '0 9px', fontWeight: 700, fontSize: 12 }}>
             ⤓ PPTX
           </button>
+          {hiddenSlides.length > 0 && (
+            <EditGate>
+              <div style={{ position: 'relative' }}>
+                <button onClick={() => setHiddenPanelOpen((v) => !v)} title="Manage hidden slides" style={{ ...barBtn, width: 'auto', padding: '0 9px', fontSize: 11, gap: 4 }}>
+                  👁 {hiddenSlides.length}
+                </button>
+                {hiddenPanelOpen && (
+                  <div
+                    style={{
+                      position: 'absolute', top: 32, left: 0, zIndex: 2147483600, width: 220, background: '#fff', border: '1px solid #d4dbe3',
+                      borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,.25)', padding: 8, maxHeight: 260, overflowY: 'auto',
+                    }}
+                  >
+                    <div style={{ fontSize: 10, color: '#8a97a6', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6, padding: '0 4px' }}>
+                      Hidden from this month's deck
+                    </div>
+                    {hiddenSlides.map((s) => (
+                      <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 4px', borderRadius: 5 }}>
+                        <span style={{ flex: 1, fontSize: 12, color: '#33485e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
+                        <button
+                          onClick={() => onShowSlide(s.key)}
+                          style={{ border: 'none', background: '#eef7f1', color: '#15662f', borderRadius: 5, padding: '3px 7px', fontSize: 11, fontWeight: 600, cursor: 'pointer', flex: 'none' }}
+                        >
+                          ↺ Show
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </EditGate>
+          )}
           <button onClick={() => setSlideBarOpen(false)} title="Hide toolbar" style={{ width: 24, height: 28, border: 'none', background: 'none', fontSize: 13, color: '#9aa6b3' }}>
             ✕
           </button>
@@ -169,7 +233,14 @@ export default function MonthlySlides() {
       )}
 
       <div className="deck-print-root">
-        <SlideDeck slides={slides} activeIndex={clampedIndex} onIndexChange={setActiveIndex} deckRef={deckRef} />
+        <SlideDeck
+          slides={slides}
+          activeIndex={clampedIndex}
+          onIndexChange={setActiveIndex}
+          deckRef={deckRef}
+          onReorder={isAdmin ? onReorderSlides : undefined}
+          onHide={isAdmin ? onHideSlide : undefined}
+        />
       </div>
     </div>
   );

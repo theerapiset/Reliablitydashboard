@@ -239,6 +239,7 @@ export interface Year {
   backups: string[]; // pasted/uploaded backup slide images (data URLs)
   coverImage?: string; // title-slide cover photo (data URL)
   slideOrder?: Record<string, string[]>; // month -> custom slide key order
+  hiddenSlides?: Record<string, string[]>; // month -> slide keys hidden from the deck/PDF/PPTX/Present
 }
 
 export interface Store {

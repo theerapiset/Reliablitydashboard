@@ -19,17 +19,25 @@ export default function SlideDeck({
   activeIndex,
   onIndexChange,
   deckRef,
+  onReorder,
+  onHide,
 }: {
   slides: SlideSpec[];
   activeIndex: number;
   onIndexChange: (i: number) => void;
   deckRef?: React.MutableRefObject<SlideDeckHandle | null>;
+  /** Drag a thumbnail to reorder — called with the full new key order. */
+  onReorder?: (keys: string[]) => void;
+  /** Hide a slide from this month's deck/PDF/PPTX/Present (not a data delete). */
+  onHide?: (key: string) => void;
 }) {
   const stageWrapRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const dragIndexRef = useRef<number | null>(null);
   const [scale, setScale] = useState(1);
   const [presenting, setPresenting] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   useLayoutEffect(() => {
     const el = stageWrapRef.current;
@@ -89,12 +97,28 @@ export default function SlideDeck({
       {!presenting && (
         <div className="deck-no-print" style={{ width: 168, flex: 'none', background: '#161f29', borderRight: '1px solid #2a3846', overflowY: 'auto', padding: '10px 8px' }}>
           {slides.map((s, i) => (
-            <button
+            <div
               key={s.key}
               onClick={() => onIndexChange(i)}
+              draggable={!!onReorder}
+              onDragStart={() => { dragIndexRef.current = i; }}
+              onDragOver={(e) => { if (onReorder) { e.preventDefault(); setDragOverIndex(i); } }}
+              onDragLeave={() => setDragOverIndex((idx) => (idx === i ? null : idx))}
+              onDrop={(e) => {
+                e.preventDefault();
+                const from = dragIndexRef.current;
+                dragIndexRef.current = null;
+                setDragOverIndex(null);
+                if (!onReorder || from == null || from === i) return;
+                const keys = slides.map((sl) => sl.key);
+                const [moved] = keys.splice(from, 1);
+                keys.splice(i, 0, moved);
+                onReorder(keys);
+              }}
+              onDragEnd={() => { dragIndexRef.current = null; setDragOverIndex(null); }}
               style={{
-                display: 'block', width: '100%', border: i === activeIndex ? '2px solid #4a90d9' : '2px solid transparent',
-                borderRadius: 6, padding: 0, marginBottom: 8, background: 'none', cursor: 'pointer',
+                display: 'block', width: '100%', border: dragOverIndex === i ? '2px solid #3fae6a' : i === activeIndex ? '2px solid #4a90d9' : '2px solid transparent',
+                borderRadius: 6, padding: 0, marginBottom: 8, background: 'none', cursor: onReorder ? 'grab' : 'pointer',
               }}
             >
               <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', background: '#0e1620', borderRadius: 4, overflow: 'hidden' }}>
@@ -106,11 +130,20 @@ export default function SlideDeck({
                 >
                   {s.content}
                 </div>
+                {onHide && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onHide(s.key); }}
+                    title="Hide this slide from the deck"
+                    style={{ position: 'absolute', top: 3, right: 3, width: 17, height: 17, border: 'none', borderRadius: 4, background: 'rgba(0,0,0,.6)', color: '#fff', fontSize: 10, lineHeight: 1, cursor: 'pointer' }}
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
               <div style={{ color: i === activeIndex ? '#fff' : '#8a97a6', fontSize: 10, marginTop: 3, textAlign: 'left', paddingLeft: 2 }}>
                 {i + 1}. {s.label}
               </div>
-            </button>
+            </div>
           ))}
         </div>
       )}

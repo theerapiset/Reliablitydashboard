@@ -23,6 +23,8 @@ function bullet(txt: string, red: boolean) {
 }
 
 const PTA_TARGET = 54;
+const CTA_TARGET = 65.7;
+const UNPLANNED_TARGET_PCT = 0.25;
 
 export default function SafetyReliabilitySlide() {
   const { store, year } = useStore();
@@ -30,6 +32,11 @@ export default function SafetyReliabilitySlide() {
   const cta = ctaEsdHoursAccum(year.cta);
   const pta = esdHoursAccum(year.pta);
   const ptaOver = pta > PTA_TARGET;
+  const ctaOver = cta > CTA_TARGET;
+  const unplannedPctVal = unplannedPct(year.cta);
+  const unplannedOver = unplannedPctVal > UNPLANNED_TARGET_PCT;
+  const rec = safetyRecordable(year);
+  const recordableOver = rec > 0;
   const mo = store.activeMonth;
 
   const ctaHTML = ctaEsdEvents.length
@@ -43,7 +50,6 @@ export default function SafetyReliabilitySlide() {
         })
         .join('')
     : '<div style="color:#8895a3">No PTA ESD event.</div>';
-  const rec = safetyRecordable(year);
   const recLine =
     rec === 0
       ? '<div style="color:#15662f;font-weight:600;margin-bottom:4px">No recordable incident YTD — PSE T1/2 &amp; TRIR all clean.</div>'
@@ -71,9 +77,9 @@ export default function SafetyReliabilitySlide() {
       </div>
       <div style={{ flex: 1, padding: '22px 32px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, flex: 'none' }}>
-          {kpiCard('Recordable incidents', String(rec), '', 'YTD · PSE T1/2 · TRIR', '#15662f')}
-          {kpiCard('Unplanned downtime', unplannedPct(year.cta).toFixed(2), '%', 'Target < 0.25%', '#1668c4')}
-          {kpiCard('CTA ESD hr · accum', fmt(cta), '', 'Target 65.7 h', '#1668c4')}
+          {kpiCard('Recordable incidents', String(rec), '', 'YTD · PSE T1/2 · TRIR', recordableOver ? '#cf2e2e' : '#15662f')}
+          {kpiCard('Unplanned downtime', unplannedPctVal.toFixed(2), '%', unplannedOver ? 'Target < 0.25% · over target' : 'Target < 0.25%', unplannedOver ? '#cf2e2e' : '#1668c4')}
+          {kpiCard('CTA ESD hr · accum', fmt(cta), '', ctaOver ? `Target ${CTA_TARGET} h · over target` : `Target ${CTA_TARGET} h`, ctaOver ? '#cf2e2e' : '#1668c4')}
           {kpiCard('PTA ESD hr · accum', fmt(pta), '', ptaOver ? `Target <${PTA_TARGET} · over target` : `Target <${PTA_TARGET} h`, ptaOver ? '#cf2e2e' : '#1668c4')}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, flex: 1, minHeight: 0 }}>

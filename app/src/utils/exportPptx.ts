@@ -1,5 +1,6 @@
 import PptxGenJS from 'pptxgenjs';
 import {
+  applySlideOrder,
   concernPageContent,
   concernPageCount,
   costTotals,
@@ -22,6 +23,8 @@ const BLUE = '1668C4';
 const MUTED = '6B7888';
 const DANGER = 'CF2E2E';
 const PTA_TARGET = 54;
+const CTA_TARGET = 65.7;
+const UNPLANNED_TARGET_PCT = 0.25;
 
 /** Effective (override-aware) text for a slide field key, as plain lines. */
 function ovr(year: Year, key: string, fallback: string): string {
@@ -167,6 +170,11 @@ function monthlyChartData(entries: Year['cta']) {
   };
 }
 
+interface SlideTask {
+  key: string;
+  run: () => Promise<void>;
+}
+
 export async function exportYearToPptx(year: Year, store: Store) {
   const pptx = new PptxGenJS();
   pptx.defineLayout({ name: 'DECK', width: 13.333, height: 7.5 });
@@ -175,9 +183,10 @@ export async function exportYearToPptx(year: Year, store: Store) {
   const H = 7.5;
   const mo = store.activeMonth;
   const yr = store.activeYear;
+  const tasks: SlideTask[] = [];
 
   // ---------- Slide 1 · Title ----------
-  {
+  tasks.push({ key: 'title', run: async () => {
     const s = pptx.addSlide();
     s.background = { color: 'FFFFFF' };
     s.addShape('rect', { x: 0, y: 0, w: W * 0.58, h: H, fill: { color: NAVY } });
@@ -202,10 +211,10 @@ export async function exportYearToPptx(year: Year, store: Store) {
       s.addText(label, { x, y: 5.9, w: 2.2, h: 0.3, fontFace: 'Arial', fontSize: 10, color: '7D99BC', charSpacing: 1.5 });
       s.addText(val, { x, y: 6.2, w: 2.2, h: 0.4, fontFace: 'Arial', fontSize: 13, color: 'CDD9E6' });
     });
-  }
+  } });
 
   // ---------- Slide 2 · Safety & Reliability ----------
-  {
+  tasks.push({ key: 'safety-rel', run: async () => {
     const s = pptx.addSlide();
     s.background = { color: 'FFFFFF' };
     s.addShape('rect', { x: 0, y: 0, w: W, h: 0.65, fill: { color: GREEN } });
@@ -216,18 +225,22 @@ export async function exportYearToPptx(year: Year, store: Store) {
     const rec = safetyRecordable(year);
     const cta = ctaEsdHoursAccum(year.cta);
     const pta = esdHoursAccum(year.pta);
+    const unplannedPctVal = unplannedPct(year.cta);
+    const recordableOver = rec > 0;
+    const unplannedOver = unplannedPctVal > UNPLANNED_TARGET_PCT;
+    const ctaOver = cta > CTA_TARGET;
     const ptaOver = pta > PTA_TARGET;
-    const kpis: [string, string, string][] = [
-      ['Recordable incidents', String(rec), 'YTD · PSE T1/2 · TRIR'],
-      ['Unplanned downtime', `${unplannedPct(year.cta).toFixed(2)}%`, 'Target < 0.25%'],
-      ['CTA ESD hr · accum', fmt(cta), 'Target 65.7 h'],
-      ['PTA ESD hr · accum', fmt(pta), ptaOver ? 'Over target' : `Target <${PTA_TARGET} h`],
+    const kpis: [string, string, string, boolean][] = [
+      ['Recordable incidents', String(rec), 'YTD · PSE T1/2 · TRIR', recordableOver],
+      ['Unplanned downtime', `${unplannedPctVal.toFixed(2)}%`, unplannedOver ? 'Target < 0.25% · over target' : 'Target < 0.25%', unplannedOver],
+      ['CTA ESD hr · accum', fmt(cta), ctaOver ? `Target ${CTA_TARGET} h · over target` : `Target ${CTA_TARGET} h`, ctaOver],
+      ['PTA ESD hr · accum', fmt(pta), ptaOver ? `Target <${PTA_TARGET} · over target` : `Target <${PTA_TARGET} h`, ptaOver],
     ];
-    kpis.forEach(([label, value, note], i) => {
+    kpis.forEach(([label, value, note, over], i) => {
       const x = 0.5 + i * 3.1;
       s.addShape('rect', { x, y: 0.85, w: 2.9, h: 1.15, line: { color: 'E2E7EE', width: 1 }, fill: { color: 'FFFFFF' } });
       s.addText(label.toUpperCase(), { x: x + 0.15, y: 0.92, w: 2.6, h: 0.3, fontFace: 'Arial', fontSize: 9, color: '7C8A99' });
-      s.addText(value, { x: x + 0.15, y: 1.18, w: 2.6, h: 0.5, fontFace: 'Arial', fontSize: 22, bold: true, color: i === 3 && ptaOver ? DANGER : i === 0 ? GREEN : BLUE });
+      s.addText(value, { x: x + 0.15, y: 1.18, w: 2.6, h: 0.5, fontFace: 'Arial', fontSize: 22, bold: true, color: over ? DANGER : i === 0 ? GREEN : BLUE });
       s.addText(note, { x: x + 0.15, y: 1.68, w: 2.6, h: 0.3, fontFace: 'Arial', fontSize: 9, color: MUTED });
     });
 
@@ -258,10 +271,10 @@ export async function exportYearToPptx(year: Year, store: Store) {
     caseCol('Safety case', 's2.safety', safetyFallback, 2.25, 1.5);
     caseCol('CTA ESD case', 's2.cta', ctaFallback, 3.85, 1.5);
     caseCol('PTA ESD case', 's2.pta', ptaFallback, 5.45, 1.3);
-  }
+  } });
 
   // ---------- Slide 3 · Cost & Savings ----------
-  {
+  tasks.push({ key: 'cost', run: async () => {
     const s = pptx.addSlide();
     s.background = { color: 'FFFFFF' };
     s.addShape('rect', { x: 0, y: 0, w: W, h: 0.65, fill: { color: NAVY } });
@@ -317,11 +330,12 @@ export async function exportYearToPptx(year: Year, store: Store) {
     s.addChart(pptx.ChartType.bar, sdChart, { x: 6.6, y: 2.55, w: 6.2, h: 2.9, barGrouping: 'clustered', showLegend: true, legendPos: 'b', legendFontSize: 8, catAxisLabelFontSize: 8, valAxisLabelFontSize: 8, chartColors: ['B9C2CC', '1F76C8'] });
     const noteText = htmlToLines(ovr(year, 's3.note', esc(m.sdNote))).join(' ');
     if (noteText) s.addText(noteText, { x: 6.6, y: 5.55, w: 6.2, h: 0.5, fontFace: 'Arial', fontSize: 9.5, italic: true, color: MUTED });
-  }
+  } });
 
   // ---------- Slide 4+ · Shutdown Activities (one per shutdown) ----------
   const shutdowns = year.shutdowns || [];
   shutdowns.forEach((sd, si) => {
+    tasks.push({ key: `sd-${si}`, run: async () => {
     const s = pptx.addSlide();
     s.background = { color: 'FFFFFF' };
     s.addShape('rect', { x: 0, y: 0, w: W, h: 0.65, fill: { color: NAVY } });
@@ -353,11 +367,13 @@ export async function exportYearToPptx(year: Year, store: Store) {
       ...sd.critical.map((r) => [{ text: r.equip, options: { color: BLUE } }, { text: r.work, options: {} }, { text: r.func, options: {} }]),
     ];
     s.addTable(rows, { x: 0.5, y: 2.65, w: 12.3, colW: [3.5, 6.8, 2], fontSize: 10.5, border: { type: 'solid', color: 'EEF1F5', pt: 0.5 } });
+    } });
   });
 
   // ---------- Slide 4b+ · Shutdown Performance (one per record, active month) ----------
   const shutdownPerfItems: ShutdownPerfItem[] = (year.shutdownPerf || []).filter((p) => p.month === mo);
   for (const [pi, item] of shutdownPerfItems.entries()) {
+    tasks.push({ key: `sdperf-${pi}`, run: async () => {
     const s = pptx.addSlide();
     s.background = { color: 'FFFFFF' };
     s.addShape('rect', { x: 0, y: 0, w: W, h: 0.65, fill: { color: '14365C' } });
@@ -388,6 +404,7 @@ export async function exportYearToPptx(year: Year, store: Store) {
     } else {
       s.addText('No highlight activities added yet.', { x: 0.5, y: canvasTop, w: 12.333, h: 1, fontFace: 'Arial', fontSize: 11, color: '9AA6B3', align: 'center', valign: 'middle' });
     }
+    } });
   }
 
   // ---------- Slide 5+ · Concerning Equipment (one slide per page; a case with extraPages gets several in a row) ----------
@@ -399,6 +416,7 @@ export async function exportYearToPptx(year: Year, store: Store) {
   });
   for (const [si, ref] of concernPageRefs.entries()) {
     const { item: c, pageIndex, pageCount } = ref;
+    tasks.push({ key: `concern-${c.globalIdx}-${pageIndex}`, run: async () => {
     const page = concernPageContent(c, pageIndex);
     const s = pptx.addSlide();
     s.background = { color: 'FFFFFF' };
@@ -453,15 +471,27 @@ export async function exportYearToPptx(year: Year, store: Store) {
         }
       }
     }
+    } });
   }
 
   // ---------- Backup slides ----------
-  for (const src of year.backups || []) {
+  (year.backups || []).forEach((src, bi) => {
+    tasks.push({ key: `backup-${bi}`, run: async () => {
     const s = pptx.addSlide();
     s.background = { color: '0E1620' };
     const imgData = await toEmbeddableDataUrl(src);
     if (imgData) s.addImage({ data: imgData, x: 0.5, y: 0.5, w: W - 1, h: H - 1, sizing: { type: 'contain', w: W - 1, h: H - 1 } });
-  }
+    } });
+  });
+
+  // Export order/visibility must match what the user curated in the
+  // editable deck (and therefore PDF/Present too) — slides addSlide()s in
+  // the order its run() is called, so filter+reorder the tasks themselves
+  // before executing any of them, rather than the slides after the fact.
+  const hiddenKeys = year.hiddenSlides?.[mo] || [];
+  const visibleTasks = tasks.filter((t) => !hiddenKeys.includes(t.key));
+  const orderedTasks = applySlideOrder(visibleTasks, year.slideOrder?.[mo]);
+  for (const task of orderedTasks) await task.run();
 
   await pptx.writeFile({ fileName: `GCM-PTA-Monthly-Slides-${mo}-${yr}.pptx` });
 }

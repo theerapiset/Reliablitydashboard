@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useStore } from '../../store/StoreContext';
-import { applySlideOrder, concernPageCount } from '../../utils/calc';
+import { applySlideOrder, concernPageCount, filterHiddenSlides } from '../../utils/calc';
 import type { PresentSlideSpec } from './PresentDeck';
 import type { ConcernItem } from '../../types/models';
 import PresentTitle from './slides/PresentTitle';
@@ -40,7 +40,8 @@ export function usePresentSlides(): PresentSlideSpec[] {
     (year.backups || []).forEach((src, i) => {
       list.push({ key: `backup-${i}`, content: <PresentBackup src={src} /> });
     });
-    return applySlideOrder(list, year.slideOrder?.[store.activeMonth]);
+    const visible = filterHiddenSlides(list, year.hiddenSlides?.[store.activeMonth]);
+    return applySlideOrder(visible, year.slideOrder?.[store.activeMonth]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, store.activeMonth]);
 }
