@@ -3,17 +3,22 @@ import { useUI } from '../../store/UIContext';
 import EditGate from '../EditGate';
 import { colors, fonts } from '../../theme';
 import { blankRow } from '../editor/blankRow';
-import { esdHoursAccum, fmt, monthOf, unplannedPct } from '../../utils/calc';
+import { ctaEsdHoursAccum, esdHoursAccum, fmt, monthOf, unplannedPct } from '../../utils/calc';
 import type { ReliabilityEvent } from '../../types/models';
 
 const PTA_TARGET = 54;
+const CTA_TARGET = 65.7;
+const UNPLANNED_TARGET_PCT = 0.25;
 
 export default function Reliability() {
   const { store, year, setStore } = useStore();
   const { relTab, setRelTab, openEditor } = useUI();
 
-  const cta = esdHoursAccum(year.cta);
+  const cta = ctaEsdHoursAccum(year.cta);
   const pta = esdHoursAccum(year.pta);
+  const unplannedPctVal = unplannedPct(year.cta);
+  const unplannedOver = unplannedPctVal > UNPLANNED_TARGET_PCT;
+  const ctaOver = cta > CTA_TARGET;
   const ptaOver = pta > PTA_TARGET;
   const rows = relTab === 'cta' ? year.cta : year.pta;
   const unit = relTab === 'cta' ? 'CTA' : 'PTA';
@@ -37,21 +42,21 @@ export default function Reliability() {
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 16 }}>
-        <div style={{ ...statCard, borderTop: `3px solid ${colors.blue}` }}>
+        <div style={{ ...statCard, borderTop: `3px solid ${unplannedOver ? colors.danger : colors.blue}` }}>
           <div style={{ fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.2, color: '#7c8a99', textTransform: 'uppercase' }}>Unplanned downtime</div>
-          <div style={{ fontSize: 34, fontWeight: 800, color: colors.blue, marginTop: 4 }}>
-            {unplannedPct(year.cta).toFixed(2)}
+          <div style={{ fontSize: 34, fontWeight: 800, color: unplannedOver ? colors.danger : colors.blue, marginTop: 4 }}>
+            {unplannedPctVal.toFixed(2)}
             <span style={{ fontSize: 16, color: '#9aa6b3' }}>%</span>
           </div>
-          <div style={{ fontSize: 12, color: colors.muted }}>CTA trouble + ESD · target &lt; 0.25%</div>
+          <div style={{ fontSize: 12, color: colors.muted }}>{unplannedOver ? 'CTA trouble + ESD · over target 0.25%' : 'CTA trouble + ESD · target < 0.25%'}</div>
         </div>
-        <div style={{ ...statCard, borderTop: `3px solid ${colors.blue}` }}>
+        <div style={{ ...statCard, borderTop: `3px solid ${ctaOver ? colors.danger : colors.blue}` }}>
           <div style={{ fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.2, color: '#7c8a99', textTransform: 'uppercase' }}>CTA ESD hours · accum</div>
-          <div style={{ fontSize: 34, fontWeight: 800, color: colors.blue, marginTop: 4 }}>
+          <div style={{ fontSize: 34, fontWeight: 800, color: ctaOver ? colors.danger : colors.blue, marginTop: 4 }}>
             {fmt(cta)}
             <span style={{ fontSize: 16, color: '#9aa6b3' }}> hr</span>
           </div>
-          <div style={{ fontSize: 12, color: colors.muted }}>Target 65.7 h</div>
+          <div style={{ fontSize: 12, color: colors.muted }}>{ctaOver ? `Target ${CTA_TARGET} h · over target` : `Target ${CTA_TARGET} h`}</div>
         </div>
         <div style={{ ...statCard, borderTop: `3px solid ${ptaOver ? colors.danger : colors.blue}` }}>
           <div style={{ fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.2, color: '#7c8a99', textTransform: 'uppercase' }}>PTA ESD hours · accum</div>
