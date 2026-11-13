@@ -92,15 +92,15 @@ export default function SafetyReliabilitySlide() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ background: '#eef3f8', borderRadius: 9, padding: '12px 15px' }}>
               <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 5, color: '#1d2733' }}>Safety case</div>
-              <Editable ovKey="s2.safety" html={safetyHTML} style={{ fontSize: 13, lineHeight: 1.5, color: '#3a4654' }} />
+              <Editable ovKey="s2.safety" html={safetyHTML} style={{ fontSize: 13, lineHeight: 1.5, color: '#3a4654' }} resettable />
             </div>
             <div style={{ background: '#eef3f8', borderRadius: 9, padding: '12px 15px' }}>
               <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 5, color: '#1d2733' }}>CTA ESD case</div>
-              <Editable ovKey="s2.cta" html={ctaHTML} style={{ fontSize: 13, lineHeight: 1.5, color: '#3a4654' }} />
+              <Editable ovKey="s2.cta" html={ctaHTML} style={{ fontSize: 13, lineHeight: 1.5, color: '#3a4654' }} resettable />
             </div>
             <div style={{ background: '#eef3f8', borderRadius: 9, padding: '12px 15px', flex: 1 }}>
               <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 5, color: '#1d2733' }}>PTA ESD case</div>
-              <Editable ovKey="s2.pta" html={ptaHTML} style={{ fontSize: 13, lineHeight: 1.5, color: '#3a4654' }} />
+              <Editable ovKey="s2.pta" html={ptaHTML} style={{ fontSize: 13, lineHeight: 1.5, color: '#3a4654' }} resettable />
             </div>
           </div>
         </div>
